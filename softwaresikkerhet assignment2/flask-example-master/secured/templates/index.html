@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+
+{% block page_title %}Welcome Blogpage{% endblock %}
+
+{% block body %}
+
+    <h1>Welcome to the Blog Platform</h1>
+    <a href="{{ url_for('new_post') }}">Create New Post</a>
+
+    <div>
+        {% for post in posts %}
+            <div class="post">
+                <h2>{{ post[1] }}</h2>  <!-- Title -->
+                <p>{{ post[2] }}</p>    <!-- Content (already sanitized before saving) -->
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

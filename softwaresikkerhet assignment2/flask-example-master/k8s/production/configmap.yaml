@@ -1,0 +1,15 @@
+# Nginx ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        
+        location / {
+            proxy_pass http://flask-example-svc.production.svc.cluster.local:5000;
+        }
+    }

@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block page_title %}Welcome Blogpage{% endblock %}
+
+{% block body %}
+    <h1>Welcome to the Blog Platform</h1>
+
+    {% if 'current_user' in session and session.get('2fa_verified') %}
+        <p>Hello, {{ session['current_user'] }}!</p>
+        <p><a href="{{ url_for('new_post') }}">Create New Post</a></p>
+        <p><a href="{{ url_for('FUN_private') }}">Go to your private page</a></p>
+        <p><a href="{{ url_for('FUN_logout') }}">Logout</a></p>
+    {% else %}
+        <p>New here? <a href="{{ url_for('register') }}">Register</a> </p>
+    {% endif %}
+
+    <div>
+        {% for post in posts %}
+            <div class="post">
+                <h2>{{ post[1] | safe }}</h2>  <!-- Title (not secured) -->
+                <p>{{ post[2] | safe }}</p>    <!-- Content (not secured) -->
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

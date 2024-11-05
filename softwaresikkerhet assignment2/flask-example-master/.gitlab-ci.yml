@@ -1,0 +1,26 @@
+stages:
+  - test
+  - build
+
+
+test:
+  stage: test
+  image: python:3.10
+  script:
+    - cd unsecured
+    - pip install -r requirements.txt  
+    - pytest test/test_app.py
+  tags:
+    - default
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}:latest"
+  when: manual    

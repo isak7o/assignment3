@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Two-Factor Authentication Verification</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.united.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Two-Factor Authentication Verification</h2>
+        <p>Please enter the code from your authenticator app to proceed.</p>
+
+        <!-- 2FA Verification Form -->
+    <form action="{{ url_for('verify_2fa') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="totp_code">Enter the 2FA code:</label>
+        <input type="text" name="totp_code" required>
+        <button type="submit">Verify</button>
+    </form>
+
+
+        <!-- Link to set up 2FA if not set up -->
+        <p>
+            {% if not session.get("2fa_verified") %}
+                If you haven't set up two-factor authentication, <a href="{{ url_for('setup_2fa') }}">set it up here</a>.
+            {% endif %}
+        </p>
+    </div>
+</body>
+</html>

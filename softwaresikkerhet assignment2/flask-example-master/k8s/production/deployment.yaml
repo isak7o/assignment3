@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-example
+  annotations:
+         argocd-image-updater.argoproj.io/image-list: registry.internal.uia.no/ikt206-g-24v-devops/examgroup6/flask-example:latest
+         argocd-image-updater.argoproj.io/write-back-method: git  
+spec:
+  selector:
+    matchLabels:
+      app: flask-example
+  template:
+    metadata:
+      labels:
+        app: flask-example
+    spec:
+      containers:
+      - name: flask-example
+        image: registry.internal.uia.no/ikt206-g-24v-devops/examgroup6/flask-example:latest
+        imagePullPolicy: Always 
+        ports:
+        - containerPort: 5000
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: POSTGRES_DB
+          value: "japan"
+        - name: POSTGRES_USER
+          value: "aubyogsigurd"
+        - name: POSTGRES_PASSWORD
+          value: "sigurdogauby"
+        - name: POSTGRES_HOST
+          value: "postgres-svc.production.svc.cluster.local"
+        - name: POSTGRES_PORT
+          value: "5432"
+      imagePullSecrets:
+        - name: secrets-production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:latest
+        env:
+        - name: POSTGRES_DB
+          value: japan
+        - name: POSTGRES_USER
+          value: aubyogsigurd
+        - name: POSTGRES_PASSWORD
+          value: sigurdogauby
+        ports:
+        - containerPort: 5432
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1000m" 
+---
+# Nginx deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+
+
+
+
+
+

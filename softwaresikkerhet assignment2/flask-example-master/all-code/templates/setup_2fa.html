@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Two-Factor Authentication Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.united.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Two-Factor Authentication Setup</h2>
+        <p>Scan this QR code with your authenticator app:</p>
+
+        <!-- Display the QR code image -->
+        <img src="data:image/png;base64,{{ qr_data }}" alt="QR Code">
+
+        <p>Or manually enter this code in your app:</p>
+        <p><strong>{{ totp_secret }}</strong></p>
+
+        <!-- Button to go back to the homepage after setting up 2FA -->
+        <a href="{{ url_for('FUN_root') }}" class="btn btn-primary">Done - Go to Home</a>
+    </div>
+</body>
+</html>
