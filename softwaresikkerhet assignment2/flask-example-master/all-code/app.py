@@ -2,6 +2,8 @@ import os
 import sqlite3
 import bcrypt
 import datetime
+from authlib.integrations.flask_client import OAuth
+from flask import Flask, redirect, url_for, session
 import hashlib
 import pyotp
 import qrcode
@@ -17,7 +19,7 @@ from database2 import (
     list_users, verify_user, delete_user_from_db, add_user, increment_login_attempts,
     reset_login_attempts, check_account_lock, set_two_factor_secret, get_two_factor_secret,
     read_note_from_db, write_note_into_db, delete_note_from_db, match_user_id_with_note_id,
-    image_upload_record, list_images_for_user, match_user_id_with_image_uid, delete_image_from_db
+    image_upload_record, list_images_for_user, match_user_id_with_image_uid, delete_image_from_db, get_user_by_username
 )
 
 app = Flask(__name__)
@@ -25,6 +27,16 @@ app.config.from_object('config')
 app.secret_key = 'your_secret_key'
 csrf = CSRFProtect(app)
 
+# Initialize OAuth
+oauth = OAuth(app)
+oauth.register(
+    name="github",
+    client_id=app.config["OAUTH2_CLIENT_ID"],
+    client_secret=app.config["OAUTH2_CLIENT_SECRET"],
+    authorize_url="https://github.com/login/oauth/authorize",
+    access_token_url="https://github.com/login/oauth/access_token",
+    client_kwargs={"scope": "user:email"},
+)
 
 # Secure session configuration
 app.config['SESSION_COOKIE_SECURE'] = True
@@ -42,7 +54,6 @@ def login_required(f):
             return redirect(url_for('setup_2fa'))
         return f(*args, **kwargs)
     return decorated_function
-
 
 # 2FA setup route
 @app.route("/setup_2fa")
@@ -76,6 +87,37 @@ def setup_2fa():
     # Render the 2FA setup page with the QR code
     return render_template("setup_2fa.html", qr_data=qr_b64)
 
+# OAuth2 Login Route
+@app.route("/login/oauth")
+def login_oauth():
+    redirect_uri = url_for("auth_callback", _external=True)
+    return oauth.github.authorize_redirect(redirect_uri)
+
+# OAuth2 Callback Route
+@app.route("/auth/callback")
+def auth_callback():
+    # Get the token
+    token = oauth.github.authorize_access_token()
+    # Fetch user information
+    user_info = oauth.github.get("https://api.github.com/user").json()
+
+    # Extract user details
+    email = user_info.get("email")
+    username = user_info.get("login")
+
+    # Check if the user already exists in the database
+    existing_user = get_user_by_username(username=username)
+    if not existing_user:
+        # Add new user to database
+        add_user(username=username, password=None, email=email)
+
+    # Store user in session and mark as authenticated
+    session["current_user"] = username
+    session["2fa_verified"] = True  # Assuming OAuth bypasses 2FA for simplicity
+
+    return redirect(url_for("FUN_root"))  # Redirect to homepage
+
+
 
 # 2FA verification route
 @app.route("/verify_2fa", methods=["GET", "POST"])
@@ -108,9 +150,7 @@ def verify_2fa():
         flash("Invalid 2FA code. Please try again.", "danger")
         return redirect(url_for("verify_2fa"))
 
-
-
-
+# Registration route
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'GET':
@@ -139,7 +179,6 @@ def register():
     except SQLAlchemyError:
         flash("Username or email already exists", "danger")
         return redirect(url_for("register"))
-
 
 # Login endpoint with brute-force protection
 @app.route('/login', methods=['GET', 'POST'])
@@ -177,8 +216,6 @@ def FUN_login():
         flash("Invalid username or password", "danger")
         return redirect(url_for("FUN_root"))  # Redirect back to root page on failure
 
-
-
 # Error handlers
 @app.errorhandler(401)
 def FUN_401(error):
@@ -195,8 +232,6 @@ def FUN_logout():
     session.pop("2fa_verified", None)  # Clear 2FA verified flag
     return redirect(url_for("FUN_root"))
 
-
-# Root route
 # Root route
 @app.route("/")
 def FUN_root():
@@ -209,7 +244,6 @@ def FUN_root():
         # User is not logged in or 2FA is not verified, load public posts or a generic homepage
         posts = read_note_from_db('public')  # Load public posts or a generic view
         return render_template("index.html", posts=posts, user=None)
-
 
 # New post route
 @app.route("/new", methods=["GET", "POST"])
@@ -225,7 +259,6 @@ def new_post():
         return redirect(url_for("FUN_root"))  # Redirect to homepage after successful post creation
 
     return render_template("new_post.html")
-
 
 @app.route("/public")
 def FUN_public():

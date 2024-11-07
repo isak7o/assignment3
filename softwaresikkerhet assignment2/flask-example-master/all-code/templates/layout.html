@@ -36,7 +36,6 @@
                 <ul class="nav navbar-nav navbar-right">
                     {% if not session.get("current_user") %}
                         <!-- Login Form in Navbar with CSRF Token -->
-                        <!-- Inside the form in layout.html -->
                         <form action="{{ url_for('FUN_login') }}" method="post" class="navbar-form navbar-right">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="form-group">
@@ -48,6 +47,8 @@
                             <button type="submit" class="btn btn-success">Log In</button>
                         </form>
 
+                        <!-- OAuth2 Login Button -->
+                        <li><a href="{{ url_for('login_oauth') }}" class="btn btn-info navbar-btn">Login with Github</a></li>
                     {% else %}
                         <li><a><b>{{ session.get("current_user") }}</b></a></li>
                         <li><a href="{{ url_for('FUN_logout') }}"><b><u>Logout</u></b></a></li>
@@ -76,13 +77,5 @@
         <div>{% block body %}{% endblock %}</div>
     </div>
 
-    <!-- Footer -->
-    <div class='container'>
-        <hr>
-        Developed by <a href='https://github.com/XD-DENG'>XD-DENG</a>
-        <a href="http://flask.pocoo.org/">
-            <img src="{{ url_for('static', filename='img/flask-powered.png') }}" border="0" align="right" alt="Flask powered" title="Flask powered">
-        </a>
-    </div>
 </body>
 </html>
