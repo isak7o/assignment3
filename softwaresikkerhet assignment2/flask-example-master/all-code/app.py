@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 from datetime import timedelta
 from flask_wtf.csrf import CSRFProtect
+from uuid import uuid4
 from functools import wraps
 from database2 import (
     list_users, verify_user, delete_user_from_db, add_user, increment_login_attempts,
@@ -88,14 +89,26 @@ def setup_2fa():
     return render_template("setup_2fa.html", qr_data=qr_b64)
 
 # OAuth2 Login Route
+
 @app.route("/login/oauth")
 def login_oauth():
     redirect_uri = url_for("auth_callback", _external=True)
-    return oauth.github.authorize_redirect(redirect_uri)
+    state = str(uuid4())  # Generer en tilfeldig state
+    session['oauth_state'] = state  # Lagre state i session for å sammenligne senere
+    return oauth.github.authorize_redirect(redirect_uri, state=state)
+
 
 # OAuth2 Callback Route
 @app.route("/auth/callback")
 def auth_callback():
+    # Verify that the state matches
+    request_state = request.args.get('state')
+    session_state = session.pop('oauth_state', None)
+
+    if session_state != request_state:
+        flash("CSRF Warning! State not equal in request and response.", "danger")
+        return redirect(url_for("FUN_root"))
+
     # Get the token
     token = oauth.github.authorize_access_token()
     # Fetch user information
