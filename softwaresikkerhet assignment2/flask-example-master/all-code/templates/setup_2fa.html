@@ -16,8 +16,8 @@
         <p>Or manually enter this code in your app:</p>
         <p><strong>{{ totp_secret }}</strong></p>
 
-        <!-- Button to go back to the homepage after setting up 2FA -->
-        <a href="{{ url_for('FUN_root') }}" class="btn btn-primary">Done - Go to Home</a>
+        <!-- Redirect to the 2FA verification page -->
+        <a href="{{ url_for('verify_2fa') }}" class="btn btn-primary">Proceed to Verification</a>
     </div>
 </body>
 </html>

@@ -1,12 +1,18 @@
 import os
 import sqlite3
+import uuid
+
 import bcrypt
 import datetime
+
+import bleach
+from astropy.utils.data import import_file_to_cache
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, redirect, url_for, session
 import hashlib
 import pyotp
 import qrcode
+import logging
 from io import BytesIO
 from base64 import b64encode
 from flask import Flask, session, url_for, redirect, render_template, request, jsonify, flash
@@ -20,13 +26,33 @@ from database2 import (
     list_users, verify_user, delete_user_from_db, add_user, increment_login_attempts,
     reset_login_attempts, check_account_lock, set_two_factor_secret, get_two_factor_secret,
     read_note_from_db, write_note_into_db, delete_note_from_db, match_user_id_with_note_id,
-    image_upload_record, list_images_for_user, match_user_id_with_image_uid, delete_image_from_db, get_user_by_username
+    image_upload_record, list_images_for_user, match_user_id_with_image_uid, delete_image_from_db, get_user_by_username,
+    users_table
 )
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 app = Flask(__name__)
 app.config.from_object('config')
 app.secret_key = 'your_secret_key'
 csrf = CSRFProtect(app)
+
+# Koble til databasen
+conn = sqlite3.connect('database_file/notes.db')
+cursor = conn.cursor()
+
+# Hent og rens alle innlegg
+cursor.execute("SELECT note_id, note FROM notes")
+notes = cursor.fetchall()
+
+for note_id, note in notes:
+    # Rens innholdet og oppdater databasen
+    clean_note = bleach.clean(note)
+    cursor.execute("UPDATE notes SET note = ? WHERE note_id = ?", (clean_note, note_id))
+
+conn.commit()
+conn.close()
+
+
 
 # Initialize OAuth
 oauth = OAuth(app)
@@ -193,41 +219,59 @@ def register():
         flash("Username or email already exists", "danger")
         return redirect(url_for("register"))
 
-# Login endpoint with brute-force protection
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route('/login', methods=['POST'])
 def FUN_login():
-    if request.method == 'GET':
-        return redirect(url_for('FUN_root'))  # Redirect if accessed directly via GET
+    # Kontroller om forespørselen er en POST-forespørsel
+    if request.method == 'POST':
+        username = request.form.get('id')
+        password = request.form.get('pw')
+        totp_code = request.form.get('totp_code')
 
-    # Handle POST request for login form submission
-    username = request.form.get('id')
-    password = request.form.get('pw')
+        # Valider at brukernavn og passord er fylt ut
+        if not username or not password:
+            flash("Username and password are required", "danger")
+            return redirect(url_for("FUN_root"))
 
-    if not username or not password:
-        flash("Username and password are required", "danger")
-        return redirect(url_for("FUN_root"))
+        # Sjekk om kontoen er låst
+        if check_account_lock(username):
+            flash("Account is locked due to too many failed attempts. Try again later.", "danger")
+            return redirect(url_for("FUN_root"))
 
-    if check_account_lock(username):
-        flash("Account is locked due to too many failed attempts", "danger")
-        return redirect(url_for("FUN_root"))
+        # Verifiser brukeren med brukernavn og passord
+        user = verify_user(username, password)
+        if user:
+            # Tilbakestill antall mislykkede forsøk hvis innloggingen er vellykket
+            reset_login_attempts(username)
+            session['current_user'] = username
 
-    user = verify_user(username=username, password=password)
-    if user:
-        reset_login_attempts(username)
-        session['current_user'] = username
+            # Hvis brukeren har aktivert 2FA, bekreft TOTP-koden
+            totp_secret = get_two_factor_secret(username)
+            if totp_secret:
+                totp = pyotp.TOTP(totp_secret)
+                if not totp.verify(totp_code):
+                    flash("Invalid 2FA code. Please try again.", "danger")
+                    return redirect(url_for("FUN_root"))
 
-        # Check if 2FA is enabled for this user
-        if get_two_factor_secret(username):
-            # Redirect to verify 2FA page
-            return redirect(url_for("verify_2fa"))
-        else:
-            # No 2FA, proceed to the home page
+            # Markér brukeren som autentisert med 2FA
+            session['2fa_verified'] = True
             flash("Login successful", "success")
             return redirect(url_for("FUN_root"))
-    else:
-        increment_login_attempts(username)
-        flash("Invalid username or password", "danger")
-        return redirect(url_for("FUN_root"))  # Redirect back to root page on failure
+
+        else:
+            # Øk antallet mislykkede forsøk ved feil brukernavn/passord
+            increment_login_attempts(username)
+
+            # Sjekk om kontoen nå er låst etter mislykket forsøk
+            if check_account_lock(username):
+                flash("Account is locked due to too many failed attempts. Try again later.", "danger")
+            else:
+                flash("Invalid username or password", "danger")
+
+            return redirect(url_for("FUN_root"))
+
+    return redirect(url_for("FUN_root"))
+
 
 # Error handlers
 @app.errorhandler(401)
@@ -248,15 +292,15 @@ def FUN_logout():
 # Root route
 @app.route("/")
 def FUN_root():
-    # Check if the user is logged in
+    # Hent alle innlegg fra databasen
+    all_posts = read_note_from_db()
+
+    # Sjekk om brukeren er logget inn
     if 'current_user' in session and session.get('2fa_verified'):
-        # User is logged in and 2FA is verified, load their posts
-        posts = read_note_from_db(session['current_user'])
-        return render_template("index.html", posts=posts, user=session['current_user'])
+        return render_template("index.html", posts=all_posts)
     else:
-        # User is not logged in or 2FA is not verified, load public posts or a generic homepage
-        posts = read_note_from_db('public')  # Load public posts or a generic view
-        return render_template("index.html", posts=posts, user=None)
+        return render_template("index.html", posts=all_posts)
+
 
 # New post route
 @app.route("/new", methods=["GET", "POST"])
@@ -265,11 +309,13 @@ def new_post():
     if request.method == "POST":
         title = request.form.get("title")
         content = request.form.get("content")
-
-        # Save the post to the database using the current user's session
-        write_note_into_db(session['current_user'], f"{title}: {content}")
-        flash("New post created successfully", "success")
-        return redirect(url_for("FUN_root"))  # Redirect to homepage after successful post creation
+        if title and content:
+            # Lagre innlegget i databasen ved å bruke den oppdaterte funksjonen
+            write_note_into_db(session['current_user'], f"{title}: {content}")
+            flash("New post created successfully", "success")
+        else:
+            flash("Both title and content are required", "danger")
+        return redirect(url_for("FUN_root"))  # Redirect til hovedsiden etter å ha lagret innlegget
 
     return render_template("new_post.html")
 
@@ -318,6 +364,30 @@ def FUN_upload_image():
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], image_uid + "-" + filename))
     image_upload_record(image_uid, session['current_user'], filename, upload_time)
     return redirect(url_for("FUN_private"))
+
+def read_note_from_db(user_id=None):
+    try:
+        conn = sqlite3.connect('database_file/notes.db')
+        cursor = conn.cursor()
+
+        if user_id:
+            cursor.execute("SELECT note_id, note, timestamp FROM notes WHERE user = ?", (user_id,))
+        else:
+            cursor.execute("SELECT note_id, note, timestamp, user FROM notes")
+
+        notes = cursor.fetchall()
+        conn.close()
+        return notes
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}")
+        return []
+
+
+def list_users():
+    result = session.execute(users_table.select()).fetchall()
+    print(result)
+    return [row.username for row in result]
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

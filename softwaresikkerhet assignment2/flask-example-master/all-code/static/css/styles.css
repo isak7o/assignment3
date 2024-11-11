@@ -1,0 +1,33 @@
+.card:hover {
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+}
+
+.card-title {
+    color: #5c2040;
+}
+
+.btn-primary {
+    background-color: #5c2040;
+    border-color: #5c2040;
+}
+
+.btn-primary:hover {
+    background-color: #732652;
+    border-color: #732652;
+}
+
+.post-content {
+    font-size: 18px;  /* Adjust the size as needed */
+    line-height: 1.6; /* Adjust line spacing for readability */
+    color: #333;      /* Adjust color if needed */
+}
+
+.post-content img {
+    max-width: 100%;
+    height: auto;
+}
+.post-content a {
+    color: #5c2040;
+}
+

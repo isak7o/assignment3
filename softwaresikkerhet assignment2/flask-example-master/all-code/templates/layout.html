@@ -44,11 +44,14 @@
                             <div class="form-group">
                                 <input type="password" name="pw" placeholder="Password" class="form-control" required>
                             </div>
+                            <div class="form-group">
+                                <input type="text" name="totp_code" placeholder="TOTP Code" class="form-control" required>
+                            </div>
                             <button type="submit" class="btn btn-success">Log In</button>
                         </form>
 
-                        <!-- OAuth2 Login Button -->
-                        <li><a href="{{ url_for('login_oauth') }}" class="btn btn-info navbar-btn">Login with Github</a></li>
+                        <!-- OAuth2 Login Button for GitHub -->
+                        <li><a href="{{ url_for('login_oauth') }}" class="btn btn-info navbar-btn">Login with GitHub</a></li>
                     {% else %}
                         <li><a><b>{{ session.get("current_user") }}</b></a></li>
                         <li><a href="{{ url_for('FUN_logout') }}"><b><u>Logout</u></b></a></li>
