@@ -4,9 +4,6 @@
 
 {% block body %}
 <div class="container-fluid mt-5">
-    <!-- Velkomstmelding -->
-    <h1 class="text-center display-4">Welcome to the Blog Platform</h1>
-
     <!-- Hvis brukeren er logget inn -->
     {% if 'current_user' in session and session.get('2fa_verified') %}
         <div class="alert alert-success text-center mt-4 py-3">

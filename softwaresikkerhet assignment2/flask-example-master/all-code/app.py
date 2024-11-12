@@ -323,33 +323,11 @@ def new_post():
 def FUN_public():
     return render_template("public_page.html")
 
-# Private route
-@app.route("/private/")
-@login_required
-def FUN_private():
-    notes_list = read_note_from_db(session['current_user'])
-    notes_table = zip(
-        [x[0] for x in notes_list],
-        [x[1] for x in notes_list],
-        [x[2] for x in notes_list],
-        ["/delete_note/" + x[0] for x in notes_list]
-    )
-    images_list = list_images_for_user(session['current_user'])
-    images_table = zip(
-        [x[0] for x in images_list],
-        [x[1] for x in images_list],
-        [x[2] for x in images_list],
-        ["/delete_image/" + x[0] for x in images_list]
-    )
-    return render_template("private_page.html", notes=notes_table, images=images_table)
-
-# File upload configuration
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 # Image upload route
+def allowed_file(filename):
+    pass
+
+
 @app.route("/upload_image", methods=['POST'])
 @login_required
 def FUN_upload_image():
